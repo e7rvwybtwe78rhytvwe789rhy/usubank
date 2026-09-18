@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USUBank POS & Payment Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans flex flex-col items-center justify-center p-4">
+
+  <!-- DEVICE SELECTOR -->
+  <div id="device-selector" class="w-full max-w-md bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center shadow-2xl">
+    <h1 class="text-3xl font-black text-amber-400 mb-2">USUBank System</h1>
+    <p class="text-slate-400 mb-6 text-sm">Choose mode for this device</p>
+    <div class="grid grid-cols-2 gap-4">
+      <button onclick="startMode('pc')" class="bg-indigo-600 hover:bg-indigo-500 font-bold py-4 rounded-xl shadow-lg border border-indigo-400">
+        💻 PC (POS)
+      </button>
+      <button onclick="startMode('phone')" class="bg-emerald-600 hover:bg-emerald-500 font-bold py-4 rounded-xl shadow-lg border border-emerald-400">
+        📱 Phone (Reader)
+      </button>
+    </div>
+  </div>
+
+  <!-- PC POS MODE -->
+  <div id="pc-pos" class="hidden w-full max-w-lg bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-xl font-bold text-indigo-400">💻 PC Store POS</h2>
+      <span id="pc-status" class="bg-amber-500/20 text-amber-400 text-xs px-3 py-1 rounded-full font-mono border border-amber-500/40">Connecting...</span>
+    </div>
+
+    <!-- ROOM CODE BOX -->
+    <div class="bg-slate-900/80 p-4 rounded-xl mb-6 text-center border border-slate-700">
+      <div class="text-slate-400 text-xs font-semibold mb-1">PAIRING CODE FOR PHONE</div>
+      <div id="room-code-display" class="text-4xl font-mono font-black text-amber-400 tracking-widest">----</div>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-slate-400 text-xs uppercase font-bold">Charge Amount (CZK / UBC)</label>
+        <div class="flex items-center gap-2 mt-1">
+          <input type="number" id="pc-amount" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-2xl font-bold text-white focus:outline-none focus:border-indigo-500">
+          <span class="text-xl font-bold text-slate-400">Kč</span>
+        </div>
+      </div>
+
+      <button id="send-btn" onclick="sendTransaction()" disabled class="w-full bg-slate-700 text-slate-400 font-bold py-4 rounded-xl shadow-lg text-lg transition-all">
+        SEND TO PHONE
+      </button>
+    </div>
+
+    <div id="pc-result" class="mt-6 hidden p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-center font-bold">
+      ✅ Payment Complete!
+    </div>
+  </div>
+
+  <!-- PHONE READER MODE -->
+  <div id="phone-reader" class="hidden w-full max-w-sm bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl text-center">
+    <h2 class="text-xl font-bold text-emerald-400 mb-4">📱 USUBank Terminal</h2>
+
+    <!-- JOIN ROOM INPUT -->
+    <div id="phone-connect-box" class="space-y-4">
+      <p class="text-slate-400 text-sm">Enter the 4-digit code shown on your PC:</p>
+      <input type="number" id="join-code" placeholder="1234" class="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 text-center text-2xl font-mono tracking-widest text-white focus:outline-none focus:border-emerald-500">
+      <button onclick="connectToPC()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl">
+        Connect to PC
+      </button>
+    </div>
+
+    <!-- WAITING SCREEN -->
+    <div id="phone-waiting" class="hidden py-8">
+      <div class="animate-pulse text-amber-400 font-bold text-lg mb-2">Connected to PC</div>
+      <p class="text-slate-400 text-sm">Waiting for incoming payment request...</p>
+    </div>
+
+    <!-- INCOMING PAYMENT SCREEN -->
+    <div id="phone-pay-box" class="hidden space-y-4 text-left">
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-center">
+        <div class="text-slate-400 text-xs font-bold">TOTAL DUE</div>
+        <div id="pay-amount-display" class="text-3xl font-black text-amber-400">0 Kč</div>
+        <div id="pay-ubc-display" class="text-xs text-slate-400">0 UBC</div>
+      </div>
+
+      <!-- CARD SCAN BUTTON -->
+      <button onclick="autoFillCard()" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-3 rounded-xl text-center border border-indigo-400">
+        [ Scan Card ]
+      </button>
+
+      <div>
+        <label class="text-slate-400 text-xs font-bold">CARD NUMBER</label>
+        <input type="text" id="card-num" placeholder="5982 5555 2222 1002" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white mt-1">
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-slate-400 text-xs font-bold">EXP</label>
+          <input type="text" id="card-exp" value="01/27" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white mt-1">
+        </div>
+        <div>
+          <label class="text-slate-400 text-xs font-bold">PIN</label>
+          <input type="password" id="card-pin" placeholder="***" maxlength="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white mt-1">
+        </div>
+      </div>
+
+      <button onclick="processPhonePayment()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-4 rounded-xl shadow-lg">
+        PAY NOW
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let peer, conn;
+    let currentAmount = 0;
+
+    function startMode(mode) {
+      document.getElementById('device-selector').classList.add('hidden');
+      if (mode === 'pc') {
+        document.getElementById('pc-pos').classList.remove('hidden');
+        initPC();
+      } else {
+        document.getElementById('phone-reader').classList.remove('hidden');
+      }
+    }
+
+    // --- PC POS LOGIC ---
+    function initPC() {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      document.getElementById('room-code-display').innerText = code;
+      
+      peer = new Peer('usubank-' + code);
+
+      peer.on('open', () => {
+        document.getElementById('pc-status').innerText = 'Waiting for Phone...';
+      });
+
+      peer.on('connection', (c) => {
+        conn = c;
+        document.getElementById('pc-status').innerText = 'Phone Connected!';
+        document.getElementById('pc-status').className = 'bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full font-mono border border-emerald-500/40';
+        
+        const btn = document.getElementById('send-btn');
+        btn.disabled = false;
+        btn.className = "w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg text-lg transition-all border border-indigo-400";
+
+        conn.on('data', (data) => {
+          if (data.type === 'PAID') {
+            document.getElementById('pc-status').innerText = 'PAYMENT SUCCESSFUL';
+            document.getElementById('pc-result').classList.remove('hidden');
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+          }
+        });
+      });
+    }
+
+    function sendTransaction() {
+      const amount = document.getElementById('pc-amount').value;
+      currentAmount = amount;
+      if (conn) {
+        conn.send({ type: 'PAY_REQUEST', amount: amount });
+        document.getElementById('pc-status').innerText = '(Done Pls Scan The Card On Phone)';
+        document.getElementById('pc-result').classList.add('hidden');
+      }
+    }
+
+    // --- PHONE TERMINAL LOGIC ---
+    function connectToPC() {
+      const code = document.getElementById('join-code').value;
+      if (!code) return alert('Please enter code');
+
+      peer = new Peer();
+      peer.on('open', () => {
+        conn = peer.connect('usubank-' + code);
+
+        conn.on('open', () => {
+          document.getElementById('phone-connect-box').classList.add('hidden');
+          document.getElementById('phone-waiting').classList.remove('hidden');
+        });
+
+        conn.on('data', (data) => {
+          if (data.type === 'PAY_REQUEST') {
+            currentAmount = data.amount;
+            document.getElementById('phone-waiting').classList.add('hidden');
+            document.getElementById('phone-pay-box').classList.remove('hidden');
+            document.getElementById('pay-amount-display').innerText = data.amount + ' Kč';
+            document.getElementById('pay-ubc-display').innerText = data.amount + ' UBC';
+          }
+        });
+      });
+    }
+
+    function autoFillCard() {
+      document.getElementById('card-num').value = '5982 5555 2222 1002';
+      document.getElementById('card-exp').value = '01/27';
+      document.getElementById('card-pin').focus();
+    }
+
+    function processPhonePayment() {
+      const pin = document.getElementById('card-pin').value;
+      if (pin !== '550') {
+        alert('❌ INCORRECT PIN! (Hint: 550)');
+        return;
+      }
+
+      if (conn) {
+        conn.send({ type: 'PAID', amount: currentAmount });
+        document.getElementById('phone-pay-box').innerHTML = `
+          <div class="text-center py-6 space-y-3">
+            <div class="text-5xl">✅</div>
+            <div class="text-2xl font-black text-emerald-400">PAY SUCCESSFUL</div>
+            <p class="text-slate-400 text-sm">${currentAmount} CZK processed via USUBank</p>
+          </div>
+        `;
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+  </script>
+</body>
+</html>
